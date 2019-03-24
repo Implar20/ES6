@@ -437,6 +437,26 @@ const DEFAULTS = {
 }
 
 function processContent(options) {
-    
+    options = Object.assign({}, DEFAULTS, options)
+    console.log(options)
 }
 ```
++ 上面的代码中，DEFAULTS 对象是默认值，options 对象是用户提供的参数。`Object.assign` 方法将 DEFAULTS 和 options 合并成一个新对象，如果两者有同名属性，则 options 的属性将覆盖 DEFAULTS 的属性值
++ 由于存在深复制的问题，DEFAULTS 对象和 options 对象的所有属性的值都只能是简单类型，而不能指向另一个对象，否则将导致 DEFAULTS 对象的该属性不起作用
+```javascript
+const DEFAULTS = {
+    url: {
+        host: 'example.com',
+        port: 7070
+    }
+}
+
+processContent({
+    url: {
+        port: 8080
+    }
+})
+// { url: { port: 8080 } }
+```
+
+## 属性的可枚举性
