@@ -460,3 +460,16 @@ processContent({
 ```
 
 ## 属性的可枚举性
++ 对象的每一个属性都具有一个描述对象 (Descriptor)，用于控制该属性的行为
++ `Object.getOwnPropertyDescriptor` 方法可以获取该属性的描述对象
++ 描述对象的 `enumerable` 属性称为 ‘可枚举性’，如果该属性为 false，就表示某些操作会忽略当前属性
++ ES5 有 3 个操作会忽略 `enumerable` 为 false 的属性
+  + `for...in` 循环：只遍历对象自身的和继承的可枚举属性
+  + `Object.keys()`：返回对象自身的所有可枚举属性的键名
+  + `JSON.stringify()`：只串行化对象自身的可枚举属性
+  + ES6 新增了一个操作 `Object.assign()`，会忽略 `enumerable` 为 false 的属性，只复制对象自身的可枚举属性
++ 这四个操作之中，只有 `for...in` 会返回继承的属性。实际上，引入 `enumerable` 的最初目的就是让某些属性可以规避掉 `for...in` 操作
++ ES6 规定，所有 `Class` 的原型的方法都是不可枚举的
++ 总的来说，操作中引入继承的属性会让问题复杂化，大多时候，我们只关心对象自身的属性。所以尽量不要用 `for...in` 训话，而用 `Object.keys()` 代替
+
+## 9.7 属性的遍历
