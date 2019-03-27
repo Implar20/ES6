@@ -473,3 +473,109 @@ processContent({
 + 总的来说，操作中引入继承的属性会让问题复杂化，大多时候，我们只关心对象自身的属性。所以尽量不要用 `for...in` 训话，而用 `Object.keys()` 代替
 
 ## 9.7 属性的遍历
++ ES6 一共有 5 种方法可以遍历对象的属性
++ `for..in`
+  + 循环遍历对象自身的和继承的可枚举属性 (不含 Symbol 属性)
++ `Object.keys(obj)`
+  + 返回一个数组，包括对象自身的 (不含继承的) 所有可枚举属性 (不含 Symbol 属性)
++ `Object.getOwnPropertyName(obj)`
+  + 返回一个数组，包含对象自身的所有属性 (不含 Symbol 属性，但是包括不可枚举属性)
++ `Object.getOwnPropertySymbols(obj)`
+  + 返回一个数组，包含对象自身的所有 Symbol 属性
++ `Reflect.ownKeys(obj)`
+  + 返回一个数组，包含对象自身的所有属性，不管属性名是 Symbol 还是字符串，也不管是否可枚举
+
++ 以上五种方法遍历对象的属性时都遵循同样的属性遍历次序规则
+  + 首先遍历所有属性名为数值的属性，按照数字排序
+  + 其次遍历所有属性名为字符串的属性，按照生成时间排序
+  + 最后遍历所有属性名为 Symbol 值的属性，按照生成时间排序
+
+## 9.8 __proto__ 属性、Object.setPrototypeOf()、Object.getPrototypeOf()
+### 9.8.1 __proto__ 属性
++ `__proto__` 属性用来读取设置当前对象的 `prototype` 对象
++ 该属性没有写入 ES6 正文，而是写入了附录，原因是 `__proto__` 前后的双下划线说明它本质上一个内部属性，而不是一个正式的对外的 API，只是由于浏览器广泛支持，才被加入了 ES6。标准明确规定，只有浏览器必须部署这个属性，其他运行环境不一定要部署，而且新的代码最好认为这个属性是不存在的。因此，无论从语义角度，还是从兼容性的角度，都不要使用这个属性，而是使用 `Object.setPrototypeOf()` (写操作)、`Object.getPrototypeOf()` (读操作) 或 `Object.create()` (生成操作) 代替
++ 在实现上，`__proto__` 调用的是 `Object.prototype.__proto__`，具体实现如下。
+```javascript
+Object.defineProperty(Object.prototype, '__proto__', {
+    get() {
+        let _thisObj = Object(this)
+        return Object.getPrototypeOf(_thisObj)
+    },
+    set(proto) {
+        if (this === undefined || this === null) {
+            throw new TypeError()
+        }
+        if (!isObject(this)) {
+            return undefined
+        }
+        if (!isObject(proto)) {
+            return undefined
+        }
+        let status = Reflect.setPrototype(this, proto)
+        if (!status) {
+            throw new TypeError()
+        }
+    }
+})
+function isObject(value) {
+    return Object(value) === value
+}
+```
++ 如果一个对象本身部署了 `__proto__` 属性，则该属性的值就是对象的原型
+
+### 9.8.2 Object.setPrototypeOf()
++ `Object.setPrototypeOf` 方法的作用与 `__proto__` 相同，用来设置一个对象的 `prototype` 对象，返回参数对象本身。它是 ES6 正式推荐的设置原型对象的方法
+```javascript
+// 格式
+Object.setPrototypeOf(object, prototype)
+// 用法
+var o = Object.setPrototypeOf({}, null)
+// 等同于下面的函数
+function (obj, proto) {
+    obj.__proto__ = proto
+    return obj
+}
+```
++ 如果第一个参数不是对象，则会自动转为对象。但是由于返回的还是第一个参数，所以这个操作不会产生任何效果
++ 由于 `undefined` 和 `null` 无法转为对象，所以如果第一个参数是 `undefined` 或 `null` 就会报错
+### 9.8.3 Object.getPrototypeOf()
++ 用于读取一个对象的 `prototype` 对象
++ 与 `setPrototypeOf` 类似
+## 9.9 Object.keys()、Object.values()、Object.entries()
+### 9.9.1 Object.keys()
++ ES6 引入了 `Object.keys` 方法，返回一个数组，成员是参数对象自身的 (不含继承的) 所有可遍历 (enumerable) 属性的键名 (属性名)
++ `Object.keys(obj)`
+### 9.9.2 Object.values()
++ 返回一个数组，成员是参数对象自身的 (不含继承的) 所有可遍历属性的键值 (属性值)
++ 顺序是：数字 => 字符串 => Symbol
++ 其中，数值大小 从小到大遍历
+```javascript
+var obj = Object.create({}, {p: {value: 42}})
+Object.values(obj)  // [] 
+```
++ `Object.create` 方法的第二个参数添加的对象属性如果不显示声明，默认是不可遍历的， 因为 p 的属性描述对象的 `enumerable` 默认是 false， `Object.values` 不会返回这个属性。
++ 如果 `Object.values` 方法的参数是一个字符串，则会返回各个字符串组成的一个数组
++ 如果参数不是对象，那么会先将其转换为对象。由于数值和布尔值的包装对象都不会为实例添加非继承的属性，所以 `Object.values` 会返回一个空数组
+### 9.9.3 Object.entries()
++ 返回一个数组，成员是参数对象自身的 (不含继承的) 所有可遍历属性的键值对数组
+```javascript
+var obj = { foo: 'bar', baz: 42 }
+Object.entries(obj) // [['foo', 'bar'], ['baz', 42]] 
+```
++ 除了返回值不同，该方法的行为与 `Object.values` 基本一致
++ 如果原对象的属性名是一个 `Symbol` 值，该属性会被忽略
++ 基本用途是遍历对象的属性：
+```javascript
+let obj = { one: 1, two: 2 }
+for (let [k, v] of Object.entries(obj)) {
+    console.log(
+        `${JSON.stringify(k)}: ${JSON.stringify(v)}`
+    )
+}
+```
++ 另一个用处就是将对象转为真正的 Map 结构
+```javascript
+var obj = { foo: 'bar', baz: 42 }
+var map = new Map(Object.entries(obj))
+map // Map { foo: 'bar', baz: 42 }
+```
