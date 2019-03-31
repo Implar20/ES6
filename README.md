@@ -579,3 +579,224 @@ var obj = { foo: 'bar', baz: 42 }
 var map = new Map(Object.entries(obj))
 map // Map { foo: 'bar', baz: 42 }
 ```
+
+## 9.10 对象的扩展运算符
++ ES2017 将扩展运算符引入了对象
+
+#### 解构赋值
++ 对象的解构赋值用于从一个对象取值，相当于将所有可遍历的、但尚未被读取的属性分配到指定的对象上面。所有的键和他们的值都会复制到新对象上面
++ 解构赋值要求等号右边是一个对象，所以如果等号右边是一个 `undefined` 和 `null` 就会报错，因为他们无法转为对象
++ 结构赋值必须是最后一个参数，否则会报错
++ 结构赋值的复制是浅复制，即如果一个键的值是复合类型的值 (数组、对象、函数)，那么解构赋值复制的就是这个值的引用，而不是这个值的副本
++ 解构赋值不会复制继承自原型对象的属性
+
+#### 扩展运算符
++ 扩展运算符 (...) 用于取出参数对象的所有可遍历属性，并将其复制到当前对象之中
++ 等同于 `Object.assign` 方法
++ 完整克隆一个对象：
+```javascript
+const clone1 = {
+    __proto__: Object.getPrototype(obj),
+    ...obj
+}
+// ===
+const clone2 = Object.assign(
+    Object.create(Object.getPrototype(obj)),
+    obj
+)   // 推荐
+```
++ 扩展运算符可用于合并两个对象：
+```javascript
+let ab = { ...a, ...b }
+// ===
+let ab = Object.assign({}, a, b)
+```
++ 如果用户自定义的属性放在扩展运算符后面，则扩展运算符内部的同名属性会被覆盖
++ 如果把自定义属性放在扩展运算符前面，就变成了设置新对象的默认属性值
++ 与数组的扩展运算符一样，对象的扩展运算符后面也可以带有表达式
+```javascript
+const obj = {
+    ...(x > 1 ? {a: 1} : {}),
+    b: 2
+}
+```
++ 如果扩展运算符后面是一个空对象，则没有任何效果
++ 如果扩展运算符的参数是 null 或 undefined，则这两个值会被忽略，不会报错
++ 扩展运算符的参数对象之中如果有取值函数 get，这个函数将会执行
+```javascript
+// 不会抛出错误，因为 x 属性只是被定义，但没有执行
+let aWithXGetter = {
+    ...a,
+    get x() {
+        throw new Error('not throw yet')
+    }
+}
+// 会抛出错误，因为 x 属性被执行了
+let runtimeError = {
+    ...a,
+    ...{
+        get x() {
+            throw new Error('throw now')
+        }
+    }
+}
+```
+### 9.11 Object.getOwnPropertyDescriptors()
++ ES5 的 `Object.getOwnPropertyDescriptor` 方法用来返回某个对象属性的描述对象
++ ES2017 引入了 `Object.getOwnPropertyDescriptor` 方法，返回指定对象所有自身属性 (非继承属性) 的描述对象
+```javascript
+function getOwnPropertyDescriptors(obj) {
+    const result = {}
+    for (let key of Reflect.ownKeys(obj)) {
+        result[key] = Object.getOwnPropertyDescriptor(obj, key)
+    }
+    return result
+} 
+```
++ 该方法主要是为了解决 `Object.assign()` 无法正确复制 get 和 set 属性的问题
+```javascript
+const source = {
+    set foo(value) {
+        console.log(value)
+    }
+}
+
+const target = {}
+Object.assign(target1, source)
+
+Object.getOwnPropertyDescriptor(target1, 'foo')
+/*
+    {
+        value: undefined,
+        writable: true,
+        enumerable: true,
+        configurable: true
+    }
+*/
+```
++ Object.assign 方法总是复制一个属性的值，而不会复制他背后的赋值方法或取值方法
++ Object.getOwnPropertyDescriptors 方法配合 Object.defineProperties 方法就可以实现正确复制
+```javascript
+const source = {
+    set foo(value) {
+        console.log(value)
+    }
+}
+
+const target2 = {}
+Object.defineProperties(target2, Object.getOwnPropertyDescriptors(source))
+Object.getOwnPropertyDescriptor(target2, 'foo')
+/*
+    {
+        get: undefined,
+        set: [Function: foo],
+        enumerable: true,
+        configurable: true
+    }
+*/
+```
++ `Object.getOwnPropertyDescriptors` 方法的另一个用处就是，配合 `Object.create` 方法将对象属性克隆到一个新对象。这属于浅复制
+```javascript
+const clone = Object.create(Object.getPrototypeOf(obj),
+              Object.getOwnPropertyDescriptors(obj))
+              
+// 或者
+
+const shallowClone = (obj) => Object.create(
+    Object.getPrototypeOf(obj),
+    Object.getOwnPropertyDescriptors(obj)
+)
+```
++ `Object.getOwnPropertyDescriptors` 方法可以实现一个对象继承另一个对象
+```javascript
+// 以前的写法
+const obj = {
+    __proto__: prot,
+    foo: 123
+}
+// ES6 
+const obj = Object.create(prot)
+obj.foo = 123
+// 或
+const obj = Object.assign(
+    Object.create(prot),
+    {
+        foo: 123
+    }
+)
+// Object.getOwnPropertyDescriptors
+const obj = Object.create(
+    prot,
+    Object.getOwnPropertyDescriptors({
+        foo: 123
+    })
+)
+```
++ Mixin 模式 (P180)
+
+### 9.12 Null 传导运算符
++ 编程实务中，如果读取对象内部的某个属性，往往需要判断该对象是否存在
++ P181 ~ 182
+
+# 第 10 章 Symbol
+## 10.1 概述
++ ES5 的对象属性名都是字符串，这容易造成属性名的冲突。
++ 比如，我们使用了一个他人提供的对象，但又想为这个对象添加新的方法 (mixin 模式)，新方法的名字就有可能与现有方法产生冲突。
++ ES6 引入了一种新的原始数据类型 `Symbol`，表示独一无二的值。他是 JS 语言的第七种数据类型，前六种分别时：Undefined、Null、String、Number、Boolean、Object
++ `Symbol` 值通过 Symbol 函数生成。也就是说，对象的属性名现在可以有两种类型：一种是原来就有的字符串，另一种就是新增的 Symbol 类型
++ 只要属性名属于 `Symbol` 类型，就是独一无二的，可以保证不会与其他属性名产生冲突
+```javascript
+let s = Symbol()
+
+typeof s    // 'symbol'
+```
++ **注意**：`Symbol` 函数前不能使用 new 命令，否则会报错。这是因为生成的 `Symbol` 是一个原始类型的值，不是对象，因此不能添加属性。基本上，他是一种类似于字符串的数据类型
++ `Symbol` 函数可以接受一个字符串作为参数，表示对 `Symbol` 实例的描述，主要是为了在控制台显示，或者转为字符串时比较容易区分
++ 如果 `Symbol` 的参数是一个对象，就会调用该对象的 `toString` 方法，将其转为字符串，然后才生成一个 `Symbol` 值
++ **注意**：Symbol 函数的参数只表示对当前 `Symbol` 值的描述，因此相同参数的 `Symbol` 函数的返回值时不相等的
++ `Symbol` 值不能与其他类型的值进行运算，否则会报错
++ `Symbol` 值可以显示的转为字符串和布尔值，但是不能转为数值
+
+## 10.2 作为属性名的 Symbol
++ 由于每一个 `Symbol` 值都是不相等的，这意味着 `Symbol` 值可以作为标识符用于对象的属性名，保证不会出现同名的属性，可以防止某一个键被不小心改写或覆盖
+```javascript
+var mySymbol = Symbol()
+
+// 1
+var a = {}
+a[mySymbol] = 'Hello!'
+// 2
+var a = {
+    [mySymbol]: 'Hello!'
+}
+// 3
+var a = {}
+Object.definedProperty(a, mySymbol, {value: 'Hello!'})
+// 以上结果都为 `Hello!`
+```
++ **注意**：`Symbol` 值作为对象属性名时，不能使用点运算符
+```javascript
+var mySymbol = Symbol()
+var a = {}
+
+a.mySymbol = 'Hello'
+a[mySymbol] // undefined
+a['mySymbol']   // 'Hello'
+```
++ 因为点运算符后面总是字符串，所以不会读取 mySymbol 作为标识名所指代的值，导致 a 的属性名实际上是一个字符串，而不是一个 `Symbol` 值
++ 在对象内部，使用 Symbol 值定义属性时，Symbol 值必须放在方括号中
+```javascript
+let s = Symbol()
+
+let obj = {
+    [s]: function (arg) { ... }
+}
+obj[s](123)
+```
++ Symbol 类型还可用于定义一组常量，保证这组常量的值都是不相等的
++ 常量使用 Symbol 值的最大好处就是，其他任何值都不可能有相同的值了，因此可以保证上面的 switch 语句按设计的方式工作
++ **注意**：`Symbol` 值作为属性名时，该属性还是公开属性，不是私有属性
+
+## 10.3 实例：消除魔术字符串
++ 魔术字符串指的是，在代码之中多次出现、与代码形成强耦合的某一个具体的字符串或数值
++ 风格良好的代码，应该尽量消除魔术字符串，而由含义清晰的变量代替
